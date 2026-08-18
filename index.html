@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14181F;
+    --panel: #1B212B;
+    --panel-raised: #212836;
+    --border: #2A3140;
+    --text: #E7EAEE;
+    --muted: #8B93A3;
+    --teal: #4FD1C5;
+    --amber: #F2A93B;
+    --red: #E5484D;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    padding: 32px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .title-block h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .title-block .subtitle {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .updated {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .updated .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    margin-right: 6px;
+  }
+
+  /* KPI strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .kpi {
+    background: var(--panel);
+    padding: 16px 18px;
+  }
+
+  .kpi .value {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .kpi .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .kpi.accent-red .value { color: var(--red); }
+  .kpi.accent-amber .value { color: var(--amber); }
+  .kpi.accent-teal .value { color: var(--teal); }
+
+  /* Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-header h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .panel-header .count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .panel-body { padding: 8px; }
+
+  /* Project plan rows */
+  .plan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 12px;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+
+  .plan-row:hover { background: var(--panel-raised); }
+
+  .plan-row .status-bar {
+    width: 4px;
+    align-self: stretch;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .plan-row .row-main { flex: 1; min-width: 0; }
+
+  .plan-row .row-title {
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .plan-row .row-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .status-complete { background: rgba(79,209,197,0.12); color: var(--teal); }
+  .status-progress { background: rgba(242,169,59,0.12); color: var(--amber); }
+  .status-notstarted { background: rgba(139,147,163,0.12); color: var(--muted); }
+  .status-atrisk { background: rgba(229,72,77,0.12); color: var(--red); }
+
+  /* RAID entries */
+  .raid-group { margin-bottom: 4px; }
+
+  .raid-group-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 10px 12px 6px;
+  }
+
+  .raid-row {
+    display: flex;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+  }
+
+  .raid-row:hover { background: var(--panel-raised); }
+
+  .raid-tab {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .tab-R { background: rgba(229,72,77,0.15); color: var(--red); }
+  .tab-A { background: rgba(79,209,197,0.15); color: var(--teal); }
+  .tab-I { background: rgba(242,169,59,0.15); color: var(--amber); }
+  .tab-D { background: rgba(139,147,163,0.15); color: var(--muted); }
+
+  .raid-row .row-title { font-size: 13px; font-weight: 500; }
+  .raid-row .row-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .empty-state {
+    padding: 32px 18px;
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  footer {
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>PROJECT DASHBOARD</h1>
+    <div class="subtitle" id="sheet-names">project plan // raid log</div>
+  </div>
+  <div class="updated"><span class="dot"></span><span id="updated-at">loading…</span></div>
+</header>
+
+<div class="kpi-strip" id="kpi-strip"></div>
+
+<div class="grid">
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Project Plan</h2>
+      <span class="count" id="plan-count">—</span>
+    </div>
+    <div class="panel-body" id="plan-body">
+      <div class="empty-state">Loading project plan…</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2>RAID Log</h2>
+      <span class="count" id="raid-count">—</span>
+    </div>
+    <div class="panel-body" id="raid-body">
+      <div class="empty-state">Loading RAID log…</div>
+    </div>
+  </div>
+</div>
+
+<footer>Data refreshed automatically via GitHub Actions from Smartsheet</footer>
+
+<script>
+// ---- Column name candidates (adjust these to match your actual Smartsheet column titles) ----
+const PLAN_TITLE_COL = ["Task Name", "Task", "Name"];
+const PLAN_STATUS_COL = ["Status", "% Complete", "Progress"];
+const PLAN_OWNER_COL = ["Owner", "Assigned To", "Assignee"];
+const PLAN_DUE_COL = ["Due Date", "End Date", "Finish"];
+
+const RAID_TYPE_COL = ["Type", "RAID Type", "Category"];
+const RAID_TITLE_COL = ["Title", "Item", "Name", "Summary"];
+const RAID_DESC_COL = ["Description", "Details", "Notes"];
+const RAID_OWNER_COL = ["Owner", "Assigned To"];
+
+function firstMatch(row, candidates) {
+  for (const key of candidates) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") return row[key];
+  }
+  return null;
+}
+
+function normalizeStatus(raw) {
+  if (!raw) return { label: "Not started", cls: "status-notstarted" };
+  const s = String(raw).toLowerCase();
+  if (s.includes("complete") || s.includes("done") || s === "100%") return { label: "Complete", cls: "status-complete" };
+  if (s.includes("risk") || s.includes("late") || s.includes("blocked") || s.includes("overdue")) return { label: "At risk", cls: "status-atrisk" };
+  if (s.includes("progress") || s.includes("active")) return { label: "In progress", cls: "status-progress" };
+  return { label: raw, cls: "status-notstarted" };
+}
+
+function raidTypeLetter(raw) {
+  if (!raw) return "I";
+  const s = String(raw).toLowerCase();
+  if (s.startsWith("r")) return "R";
+  if (s.startsWith("a")) return "A";
+  if (s.startsWith("i")) return "I";
+  if (s.startsWith("d")) return "D";
+  return "I";
+}
+
+const RAID_LABELS = { R: "Risks", A: "Actions", I: "Issues", D: "Decisions" };
+
+function renderPlan(planSheet) {
+  const rows = planSheet.rows || [];
+  document.getElementById("plan-count").textContent = rows.length + " tasks";
+
+  if (rows.length === 0) {
+    document.getElementById("plan-body").innerHTML = '<div class="empty-state">No rows found</div>';
+    return;
+  }
+
+  let html = "";
+  let atRisk = 0, complete = 0;
+
+  for (const row of rows) {
+    const title = firstMatch(row, PLAN_TITLE_COL) || "Untitled task";
+    const statusRaw = firstMatch(row, PLAN_STATUS_COL);
+    const owner = firstMatch(row, PLAN_OWNER_COL);
+    const due = firstMatch(row, PLAN_DUE_COL);
+    const status = normalizeStatus(statusRaw);
+
+    if (status.cls === "status-atrisk") atRisk++;
+    if (status.cls === "status-complete") complete++;
+
+    const barColor = status.cls === "status-atrisk" ? "var(--red)"
+                    : status.cls === "status-complete" ? "var(--teal)"
+                    : status.cls === "status-progress" ? "var(--amber)"
+                    : "var(--border)";
+
+    html += `
+      <div class="plan-row">
+        <div class="status-bar" style="background:${barColor}"></div>
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(title)}</div>
+          <div class="row-meta">
+            ${owner ? `<span>${escapeHtml(owner)}</span>` : ""}
+            ${due ? `<span>${escapeHtml(due)}</span>` : ""}
+          </div>
+        </div>
+        <span class="status-pill ${status.cls}">${escapeHtml(status.label)}</span>
+      </div>`;
+  }
+
+  document.getElementById("plan-body").innerHTML = html;
+  return { total: rows.length, atRisk, complete };
+}
+
+function renderRaid(raidSheet) {
+  const rows = raidSheet.rows || [];
+  document.getElementById("raid-count").textContent = rows.length + " items";
+
+  if (rows.length === 0) {
+    document.getElementById("raid-body").innerHTML = '<div class="empty-state">No rows found</div>';
+    return { total: 0, risks: 0 };
+  }
+
+  const groups = { R: [], A: [], I: [], D: [] };
+  for (const row of rows) {
+    const typeLetter = raidTypeLetter(firstMatch(row, RAID_TYPE_COL));
+    groups[typeLetter].push(row);
+  }
+
+  let html = "";
+  for (const letter of ["R", "A", "I", "D"]) {
+    const items = groups[letter];
+    if (items.length === 0) continue;
+    html += `<div class="raid-group"><div class="raid-group-label">${RAID_LABELS[letter]} (${items.length})</div>`;
+    for (const row of items) {
+      const title = firstMatch(row, RAID_TITLE_COL) || "Untitled item";
+      const desc = firstMatch(row, RAID_DESC_COL);
+      html += `
+        <div class="raid-row">
+          <div class="raid-tab tab-${letter}">${letter}</div>
+          <div class="row-main">
+            <div class="row-title">${escapeHtml(title)}</div>
+            ${desc ? `<div class="row-desc">${escapeHtml(String(desc).slice(0, 140))}</div>` : ""}
+          </div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+
+  document.getElementById("raid-body").innerHTML = html;
+  return { total: rows.length, risks: groups.R.length };
+}
+
+function renderKpis(planStats, raidStats) {
+  const kpis = [
+    { label: "Total tasks", value: planStats.total, accent: "" },
+    { label: "Completed", value: planStats.complete, accent: "accent-teal" },
+    { label: "At risk", value: planStats.atRisk, accent: "accent-red" },
+    { label: "Open RAID items", value: raidStats.total, accent: "" },
+    { label: "Open risks", value: raidStats.risks, accent: "accent-amber" },
+  ];
+  document.getElementById("kpi-strip").innerHTML = kpis.map(k => `
+    <div class="kpi ${k.accent}">
+      <div class="value">${k.value}</div>
+      <div class="label">${k.label}</div>
+    </div>
+  `).join("");
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[m]));
+}
+
+async function loadDashboard() {
+  try {
+    const res = await fetch("data/dashboard-data.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("fetch failed");
+    const data = await res.json();
+    hydrate(data);
+  } catch (err) {
+    console.warn("Falling back to sample data:", err);
+    hydrate(SAMPLE_DATA);
+  }
+}
+
+function hydrate(data) {
+  document.getElementById("sheet-names").textContent =
+    `${data.project_plan.sheet_name} // ${data.raid_log.sheet_name}`;
+  document.getElementById("updated-at").innerHTML =
+    `<span class="dot"></span>Updated ${new Date(data.generated_at).toLocaleString()}`;
+
+  const planStats = renderPlan(data.project_plan);
+  const raidStats = renderRaid(data.raid_log);
+  renderKpis(planStats, raidStats);
+}
+
+// Sample data shown only if data/dashboard-data.json isn't reachable (e.g. local preview)
+const SAMPLE_DATA = {
+  generated_at: new Date().toISOString(),
+  project_plan: {
+    sheet_name: "Project Plan (sample)",
+    rows: [
+      { "Task Name": "Kickoff & charter approval", "Status": "Complete", "Owner": "J. Rivera", "Due Date": "2026-06-01" },
+      { "Task Name": "Requirements gathering", "Status": "Complete", "Owner": "M. Chen", "Due Date": "2026-06-20" },
+      { "Task Name": "Vendor selection", "Status": "In Progress", "Owner": "S. Patel", "Due Date": "2026-08-15" },
+      { "Task Name": "Integration build", "Status": "At Risk", "Owner": "T. Nguyen", "Due Date": "2026-08-30" },
+      { "Task Name": "UAT", "Status": "Not Started", "Owner": "J. Rivera", "Due Date": "2026-09-10" },
+    ]
+  },
+  raid_log: {
+    sheet_name: "RAID Log (sample)",
+    rows: [
+      { "Type": "Risk", "Title": "Vendor contract delay", "Description": "Legal review may slip past target signing date, pushing integration start." },
+      { "Type": "Action", "Title": "Confirm test environment access", "Description": "Need creds provisioned for UAT team by next sprint." },
+      { "Type": "Issue", "Title": "API rate limit hit in staging", "Description": "Blocking integration testing until vendor raises the limit." },
+      { "Type": "Decision", "Title": "Use OAuth over API key", "Description": "Approved by security team on 2026-07-30." },
+    ]
+  }
+};
+
+loadDashboard();
+</script>
+
+</body>
+</html>
