@@ -73,7 +73,7 @@ def main():
 
     combined = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "project_plan": sheet_to_dict(plan_sheet, filter_done=False),
+        "project_plan": sheet_to_dict(plan_sheet),
         "raid_log": sheet_to_dict(raid_sheet, filter_done=True),
     }
 
