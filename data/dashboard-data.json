@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-19T14:19:58.280397+00:00",
+  "generated_at": "2026-08-19T16:01:57.239236+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -184,7 +184,7 @@
       },
       {
         "Risk": null,
-        "Task Name": "NotebooLM",
+        "Task Name": "NotebookLM",
         "Status": "In Progress",
         "Assigned To": "Alfred Shum",
         "Start Date": "2026-08-12T08:00:00",
@@ -199,7 +199,7 @@
       },
       {
         "Risk": null,
-        "Task Name": "Status Dashboard",
+        "Task Name": "Internal Project Status Dashboard",
         "Status": "In Progress",
         "Assigned To": "Alfred Shum",
         "Start Date": "2026-08-12T08:00:00",
