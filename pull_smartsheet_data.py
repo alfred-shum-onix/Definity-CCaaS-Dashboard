@@ -42,6 +42,11 @@ def sheet_to_dict(sheet) -> dict:
                 continue
             # display_value handles formulas/dropdowns nicely; fall back to raw value
             row_data[title] = cell.display_value if cell.display_value is not None else cell.value
+            # Exclude items marked as Done if requested
+        if filter_done:
+            done_val = str(row_data.get("Done", "")).strip().lower()
+            if done_val in ("true", "yes", "1", "done", "complete", "full"):
+                continue
         row_data["_row_id"] = row.id
         rows.append(row_data)
 
@@ -68,8 +73,8 @@ def main():
 
     combined = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "project_plan": sheet_to_dict(plan_sheet),
-        "raid_log": sheet_to_dict(raid_sheet),
+        "project_plan": sheet_to_dict(plan_sheet, filter_done=False),
+        "raid_log": sheet_to_dict(raid_sheet, filter_done=True),
     }
 
     output_path = os.environ.get("OUTPUT_PATH", "data/dashboard-data.json")
