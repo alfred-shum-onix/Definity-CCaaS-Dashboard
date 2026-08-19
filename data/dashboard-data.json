@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-19T14:06:13.564957+00:00",
+  "generated_at": "2026-08-19T14:19:58.280397+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -4344,7 +4344,7 @@
         "Assigned To": "Abdel Megahed",
         "Start Date": "2026-09-01T08:00:00",
         "End Date": "2026-12-31T16:59:59",
-        "%": "0%",
+        "%": "1%",
         "Predecessors": null,
         "Duration": "88d",
         "Deliverable": null,
@@ -4359,7 +4359,7 @@
         "Assigned To": "Abdel Megahed",
         "Start Date": "2026-09-01T08:00:00",
         "End Date": "2026-12-31T16:59:59",
-        "%": "0%",
+        "%": "2%",
         "Predecessors": null,
         "Duration": "88d",
         "Deliverable": null,
@@ -4374,7 +4374,7 @@
         "Assigned To": "Abdel Megahed",
         "Start Date": "2026-09-01T08:00:00",
         "End Date": "2026-12-31T16:59:59",
-        "%": "0%",
+        "%": "7%",
         "Predecessors": null,
         "Duration": "88d",
         "Deliverable": null,
@@ -4389,7 +4389,7 @@
         "Assigned To": "Abdel Megahed",
         "Start Date": "2026-09-01T08:00:00",
         "End Date": "2026-09-30T16:59:59",
-        "%": "0%",
+        "%": "50%",
         "Predecessors": null,
         "Duration": "22d",
         "Deliverable": null,
