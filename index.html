@@ -428,7 +428,13 @@
 const PLAN_WORKSTREAM_COL = ["Workstream", "Phase", "Track"];
 const PLAN_TASK_COL = ["Task Name", "Task", "Name"];
 const PLAN_STATUS_COL = ["Status"];
-const PLAN_PCT_COL = ["% Complete", "Percent Complete", "Completion"];
+const PLAN_PCT_COL = ["% Complete", "Percent Complete", "Completion", "%"];
+
+// Some Smartsheet plans don't have a dedicated "Workstream" column — instead the
+// plan is organized with section-header rows like "Workstream 1: Project Management"
+// followed by their tasks as regular rows underneath. This pattern detects those
+// header rows so tasks can be grouped by the section they fall under.
+const WORKSTREAM_HEADER_RE = /^workstream\s*\d+\s*:\s*(.+)$/i;
 const PLAN_OWNER_COL = ["Owner", "Assigned To"];
 const PLAN_DUE_COL = ["Due Date", "End Date"];
 
@@ -559,8 +565,7 @@ function renderPhases(workstreams, planRows) {
     return;
   }
   container.innerHTML = workstreams.map(w => {
-    const tasks = planRows.filter(r => (firstMatch(r, PLAN_WORKSTREAM_COL) || "Unassigned") === w.name);
-    const items = tasks.slice(0, 12).map(t => {
+    const items = w.rows.slice(0, 12).map(t => {
       const name = firstMatch(t, PLAN_TASK_COL) || "Untitled task";
       const status = String(firstMatch(t, PLAN_STATUS_COL) || "").toLowerCase();
       const done = status.includes("complete") || status.includes("done") || status.includes("closed");
@@ -580,12 +585,31 @@ function renderPhases(workstreams, planRows) {
 
 function computeWorkstreams(planRows) {
   const groups = {};
+  const order = [];
+  let currentSection = null; // set once we hit the first "Workstream N: ..." header row
+
   for (const row of planRows) {
-    const name = firstMatch(row, PLAN_WORKSTREAM_COL) || "Unassigned";
-    if (!groups[name]) groups[name] = [];
+    const taskName = String(firstMatch(row, PLAN_TASK_COL) || "");
+    const headerMatch = taskName.match(WORKSTREAM_HEADER_RE);
+
+    if (headerMatch) {
+      // This row is itself a section header (e.g. "Workstream 1: Project Management") —
+      // start a new group and don't count the header row as a task.
+      currentSection = headerMatch[1].trim();
+      if (!groups[currentSection]) { groups[currentSection] = []; order.push(currentSection); }
+      continue;
+    }
+
+    // Prefer an explicit Workstream/Phase/Track column if the sheet has one;
+    // otherwise fall back to whichever "Workstream N: ..." section we're currently under;
+    // otherwise it's genuinely unassigned (e.g. setup tasks before the first section).
+    const name = firstMatch(row, PLAN_WORKSTREAM_COL) || currentSection || "Unassigned";
+    if (!groups[name]) { groups[name] = []; order.push(name); }
     groups[name].push(row);
   }
-  return Object.entries(groups).map(([name, rows]) => {
+
+  return order.map(name => {
+    const rows = groups[name];
     const pctValues = rows.map(r => pctToNumber(firstMatch(r, PLAN_PCT_COL))).filter(v => v !== null);
     let pct;
     if (pctValues.length > 0) {
@@ -600,6 +624,7 @@ function computeWorkstreams(planRows) {
     return { name, total: rows.length, pct, rows, health: statusHealth(rows) };
   });
 }
+// (computeWorkstreams also removes header rows from stats so they don't skew task counts)
 
 function computeStats(planRows) {
   const total = planRows.length;
