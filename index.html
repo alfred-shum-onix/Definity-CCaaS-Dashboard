@@ -355,6 +355,34 @@
   .step-check.done { background: var(--green); }
   .step-check.pending { background: var(--panel-border); color: var(--muted); }
 
+  .phase-group { margin-top: 4px; }
+
+  .phase-group h4 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--navy-mid);
+    margin: 10px 0 2px;
+  }
+
+  .wave-group h5 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 6px 0 2px 10px;
+  }
+
+  .wave-group .step-item,
+  .phase-group > .step-item { margin-left: 10px; }
+
+  .more-note {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 4px 0 0 10px;
+  }
+
   .empty-state {
     padding: 24px;
     text-align: center;
@@ -421,6 +449,11 @@
   <div class="phase-columns" id="phase-columns"></div>
 </section>
 
+<section>
+  <div class="section-title">Completed Tasks</div>
+  <div class="phase-columns" id="completed-columns"></div>
+</section>
+
 <footer id="footer-note">Source: Project Plan &amp; RAID (Smartsheet)</footer>
 
 <script>
@@ -434,7 +467,12 @@ const PLAN_PCT_COL = ["% Complete", "Percent Complete", "Completion", "%"];
 // plan is organized with section-header rows like "Workstream 1: Project Management"
 // followed by their tasks as regular rows underneath. This pattern detects those
 // header rows so tasks can be grouped by the section they fall under.
-const WORKSTREAM_HEADER_RE = /^workstream\s*\d+\s*:\s*(.+)$/i;
+// Also matches combined/range headers like "Workstreams 6-8: AI Agents / Insights".
+const WORKSTREAM_HEADER_RE = /^workstreams?\s*\d+(?:\s*-\s*\d+)?\s*:\s*(.+)$/i;
+// Sub-section headers used inconsistently within some workstreams — not every
+// workstream has these, so grouping falls back to a flat task list where absent.
+const PHASE_HEADER_RE = /^phase\s*\d+\s*:\s*(.+)$/i;
+const WAVE_HEADER_RE = /^wave\s*\d+\s+(.+)$/i;
 const PLAN_OWNER_COL = ["Owner", "Assigned To"];
 const PLAN_DUE_COL = ["Due Date", "End Date"];
 
@@ -557,55 +595,194 @@ function renderRaid(raidRows) {
   }).join("");
 }
 
-function renderPhases(workstreams, planRows) {
-  // Groups tasks by workstream/phase and shows completion as a checklist
+function isTaskDone(row) {
+  const s = String(firstMatch(row, PLAN_STATUS_COL) || "").toLowerCase();
+  return s.includes("complete") || s.includes("done") || s.includes("closed");
+}
+
+// Keeps only tasks matching `keep(row)` in a workstream tree, dropping any
+// phase/wave that ends up empty as a result.
+function filterTree(tree, keep) {
+  const tasks = tree.tasks.filter(keep);
+  const phases = tree.phases.map(p => {
+    const pTasks = p.tasks.filter(keep);
+    const waves = p.waves
+      .map(w => ({ name: w.name, tasks: w.tasks.filter(keep) }))
+      .filter(w => w.tasks.length > 0);
+    return { name: p.name, tasks: pTasks, waves };
+  }).filter(p => p.tasks.length > 0 || p.waves.length > 0);
+  return { tasks, phases };
+}
+
+// Renders a workstream's tree (workstream → phase → wave → task) as nested checklist
+// HTML within a shared item budget, so huge workstreams don't blow out the column —
+// shows a "+N more" note instead. `checkClass`/`checkMark` control how each item's
+// checkbox looks (pending vs done).
+function renderTreeHtml(tree, budget, checkClass, checkMark) {
+  function taskItem(t) {
+    const name = firstMatch(t, PLAN_TASK_COL) || "Untitled task";
+    return `
+      <div class="step-item">
+        <span class="step-check ${checkClass}">${checkMark}</span>
+        <span>${escapeHtml(name)}</span>
+      </div>`;
+  }
+
+  let html = "";
+  let shown = 0;
+
+  const countTasks = node => (node.tasks ? node.tasks.length : 0)
+    + (node.phases || []).reduce((sum, p) => sum + countTasks(p), 0)
+    + (node.waves || []).reduce((sum, w) => sum + countTasks(w), 0);
+  const total = countTasks(tree);
+
+  for (const t of tree.tasks) {
+    if (shown >= budget) break;
+    html += taskItem(t);
+    shown++;
+  }
+  for (const phase of tree.phases) {
+    if (shown >= budget) break;
+    if (phase.name) html += `<div class="phase-group"><h4>${escapeHtml(phase.name)}</h4></div>`;
+    for (const t of phase.tasks) {
+      if (shown >= budget) break;
+      html += taskItem(t);
+      shown++;
+    }
+    for (const wave of phase.waves) {
+      if (shown >= budget) break;
+      html += `<div class="wave-group"><h5>${escapeHtml(wave.name)}</h5></div>`;
+      for (const t of wave.tasks) {
+        if (shown >= budget) break;
+        html += taskItem(t);
+        shown++;
+      }
+    }
+  }
+  if (total > shown) {
+    html += `<div class="more-note">+${total - shown} more task${total - shown === 1 ? "" : "s"}</div>`;
+  }
+  return html;
+}
+
+function renderPhases(workstreams) {
+  // Groups NOT-YET-COMPLETE tasks by workstream → phase → wave and shows them as a nested checklist.
+  // Completed tasks are moved to the "Completed Tasks" section instead (see renderCompleted).
   const container = document.getElementById("phase-columns");
   if (workstreams.length === 0) {
     container.innerHTML = `<div class="empty-state">No phase data found</div>`;
     return;
   }
+
+  const MAX_ITEMS_PER_COLUMN = 14;
+
   container.innerHTML = workstreams.map(w => {
-    const items = w.rows.slice(0, 12).map(t => {
-      const name = firstMatch(t, PLAN_TASK_COL) || "Untitled task";
-      const status = String(firstMatch(t, PLAN_STATUS_COL) || "").toLowerCase();
-      const done = status.includes("complete") || status.includes("done") || status.includes("closed");
-      return `
-        <div class="step-item">
-          <span class="step-check ${done ? "done" : "pending"}">${done ? "✓" : ""}</span>
-          <span>${escapeHtml(name)}</span>
-        </div>`;
-    }).join("");
+    const incompleteTree = w.tree ? filterTree(w.tree, t => !isTaskDone(t)) : null;
+    const body = incompleteTree ? renderTreeHtml(incompleteTree, MAX_ITEMS_PER_COLUMN, "pending", "") : "";
     return `
       <div class="phase-col">
         <h3>${escapeHtml(w.name)}</h3>
-        ${items || '<div class="empty-state">No tasks listed</div>'}
+        ${body || '<div class="empty-state">All tasks complete</div>'}
+      </div>`;
+  }).join("");
+}
+
+function renderCompleted(workstreams) {
+  // Groups COMPLETED tasks by workstream → phase → wave, same layout as Next Steps by Phase.
+  const container = document.getElementById("completed-columns");
+  if (workstreams.length === 0) {
+    container.innerHTML = `<div class="empty-state">No completed tasks yet</div>`;
+    return;
+  }
+
+  const MAX_ITEMS_PER_COLUMN = 14;
+
+  container.innerHTML = workstreams.map(w => {
+    const completedTree = w.tree ? filterTree(w.tree, t => isTaskDone(t)) : null;
+    const body = completedTree ? renderTreeHtml(completedTree, MAX_ITEMS_PER_COLUMN, "done", "✓") : "";
+    return `
+      <div class="phase-col">
+        <h3>${escapeHtml(w.name)}</h3>
+        ${body || '<div class="empty-state">No completed tasks yet</div>'}
       </div>`;
   }).join("");
 }
 
 function computeWorkstreams(planRows) {
-  const groups = {};
+  const groups = {};       // name -> flat array of leaf task rows (for stats/pct/health)
+  const trees = {};        // name -> { tasks: [], phases: [{ name, tasks: [], waves: [{ name, tasks: [] }] }] }
   const order = [];
-  let currentSection = null; // set once we hit the first "Workstream N: ..." header row
+  let currentSection = null; // current workstream name
+  let currentPhase = null;   // current phase node within currentSection's tree, or null
+  let currentWave = null;    // current wave node within currentPhase, or null
+  const preHeaderRows = []; // rows that appear before any header — folded into the first workstream
+
+  function newTree() { return { tasks: [], phases: [] }; }
+  function addTask(row) {
+    if (currentWave) currentWave.tasks.push(row);
+    else if (currentPhase) currentPhase.tasks.push(row);
+    else trees[currentSection].tasks.push(row);
+    groups[currentSection].push(row);
+  }
 
   for (const row of planRows) {
     const taskName = String(firstMatch(row, PLAN_TASK_COL) || "");
-    const headerMatch = taskName.match(WORKSTREAM_HEADER_RE);
+    const wsMatch = taskName.match(WORKSTREAM_HEADER_RE);
+    const phaseMatch = !wsMatch ? taskName.match(PHASE_HEADER_RE) : null;
+    const waveMatch = (!wsMatch && !phaseMatch) ? taskName.match(WAVE_HEADER_RE) : null;
 
-    if (headerMatch) {
+    if (wsMatch) {
       // This row is itself a section header (e.g. "Workstream 1: Project Management") —
       // start a new group and don't count the header row as a task.
-      currentSection = headerMatch[1].trim();
-      if (!groups[currentSection]) { groups[currentSection] = []; order.push(currentSection); }
+      currentSection = wsMatch[1].trim();
+      currentPhase = null;
+      currentWave = null;
+      const isFirstSection = !groups[currentSection] && order.length === 0;
+      if (!groups[currentSection]) { groups[currentSection] = []; trees[currentSection] = newTree(); order.push(currentSection); }
+      if (isFirstSection && preHeaderRows.length > 0) {
+        // Fold any setup/kickoff rows that came before the first header into this workstream.
+        groups[currentSection].push(...preHeaderRows);
+        trees[currentSection].tasks.push(...preHeaderRows);
+        preHeaderRows.length = 0;
+      }
+      continue;
+    }
+
+    if (phaseMatch && currentSection) {
+      currentPhase = { name: phaseMatch[1].trim(), tasks: [], waves: [] };
+      currentWave = null;
+      trees[currentSection].phases.push(currentPhase);
+      continue;
+    }
+
+    if (waveMatch && currentSection) {
+      currentWave = { name: waveMatch[1].trim(), tasks: [] };
+      if (currentPhase) currentPhase.waves.push(currentWave);
+      else { currentPhase = { name: "", tasks: [], waves: [currentWave] }; trees[currentSection].phases.push(currentPhase); }
       continue;
     }
 
     // Prefer an explicit Workstream/Phase/Track column if the sheet has one;
-    // otherwise fall back to whichever "Workstream N: ..." section we're currently under;
-    // otherwise it's genuinely unassigned (e.g. setup tasks before the first section).
-    const name = firstMatch(row, PLAN_WORKSTREAM_COL) || currentSection || "Unassigned";
-    if (!groups[name]) { groups[name] = []; order.push(name); }
-    groups[name].push(row);
+    // otherwise fall back to whichever "Workstream N: ..." section we're currently under.
+    const explicit = firstMatch(row, PLAN_WORKSTREAM_COL);
+    if (explicit) {
+      if (!groups[explicit]) { groups[explicit] = []; trees[explicit] = newTree(); order.push(explicit); }
+      groups[explicit].push(row);
+      trees[explicit].tasks.push(row);
+    } else if (currentSection) {
+      addTask(row);
+    } else {
+      // No section header seen yet — hold onto this row until the first one appears.
+      preHeaderRows.push(row);
+    }
+  }
+
+  // If the plan has no "Workstream N: ..." headers at all, these rows are genuinely unassigned.
+  if (preHeaderRows.length > 0) {
+    if (!groups["Unassigned"]) { groups["Unassigned"] = []; trees["Unassigned"] = newTree(); }
+    groups["Unassigned"].push(...preHeaderRows);
+    trees["Unassigned"].tasks.push(...preHeaderRows);
+    if (!order.includes("Unassigned")) order.push("Unassigned");
   }
 
   return order.map(name => {
@@ -621,7 +798,7 @@ function computeWorkstreams(planRows) {
       }).length;
       pct = rows.length > 0 ? Math.round((completeCount / rows.length) * 100) : 0;
     }
-    return { name, total: rows.length, pct, rows, health: statusHealth(rows) };
+    return { name, total: rows.length, pct, rows, tree: trees[name], health: statusHealth(rows) };
   });
 }
 // (computeWorkstreams also removes header rows from stats so they don't skew task counts)
@@ -675,7 +852,8 @@ function hydrate(data) {
   renderKpis(stats);
   renderBreakdown(workstreams);
   renderRaid(raidRows);
-  renderPhases(workstreams, planRows);
+  renderPhases(workstreams);
+  renderCompleted(workstreams);
 }
 
 async function loadDashboard() {
