@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T19:28:28.614120+00:00",
+  "generated_at": "2026-08-21T19:49:18.717682+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -7499,7 +7499,7 @@
         "Duration": null,
         "Progress": null,
         "Done": null,
-        "Status": null,
+        "Status": "Closed",
         "Notes": null,
         "Predecessor": null,
         "Priority": null,
