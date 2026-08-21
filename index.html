@@ -597,7 +597,7 @@ function renderRaid(raidRows) {
 
 function isTaskDone(row) {
   const s = String(firstMatch(row, PLAN_STATUS_COL) || "").toLowerCase();
-  return s.includes("complete") || s.includes("done") || s.includes("closed");
+  return s.includes("complete") || s.includes("done") || s.includes("closed") || s.includes("cancel");
 }
 
 // Keeps only tasks matching `keep(row)` in a workstream tree, dropping any
@@ -792,10 +792,7 @@ function computeWorkstreams(planRows) {
     if (pctValues.length > 0) {
       pct = Math.round(pctValues.reduce((a, b) => a + b, 0) / pctValues.length);
     } else {
-      const completeCount = rows.filter(r => {
-        const s = String(firstMatch(r, PLAN_STATUS_COL) || "").toLowerCase();
-        return s.includes("complete") || s.includes("done") || s.includes("closed");
-      }).length;
+      const completeCount = rows.filter(isTaskDone).length;
       pct = rows.length > 0 ? Math.round((completeCount / rows.length) * 100) : 0;
     }
     return { name, total: rows.length, pct, rows, tree: trees[name], health: statusHealth(rows) };
@@ -808,7 +805,7 @@ function computeStats(planRows) {
   let complete = 0, inProgress = 0, notStarted = 0;
   for (const row of planRows) {
     const s = String(firstMatch(row, PLAN_STATUS_COL) || "").toLowerCase();
-    if (s.includes("complete") || s.includes("done") || s.includes("closed")) complete++;
+    if (isTaskDone(row)) complete++;
     else if (s.includes("progress") || s.includes("active") || s.includes("review") || s.includes("build")) inProgress++;
     else notStarted++;
   }
