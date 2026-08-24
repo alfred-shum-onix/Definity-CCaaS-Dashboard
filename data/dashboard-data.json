@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24T18:30:39.382839+00:00",
+  "generated_at": "2026-08-24T18:37:50.280986+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -7400,7 +7400,7 @@
         "Progress": "Three Quarter",
         "Done": null,
         "Status": "In Progress",
-        "Notes": "08/05 - Pending decision on Aspect\n07/06: Finalize decision by 07/15, Pl team is good with it and pending Claims feedback\n06/10: Ian met with CTO to share the update. Definity is internally reviewing Aspect WFM or may stay with NICE WFM\n05/07: Mark Shalda & Ian will be meeting Definity onsite on 05/11 to discuss WFM options\n05/01: Internal follow-up meeting scheduled on 05/04\n04/16: Raised risk internally to leadership. Scheduled internal sync to discuss mitigation strategy on 04/20",
+        "Notes": "08/05 - Pending decision on Aspect by Definity\n07/06: Finalize decision by 07/15, Pl team is good with it and pending Claims feedback\n06/10: Ian met with CTO to share the update. Definity is internally reviewing Aspect WFM or may stay with NICE WFM\n05/07: Mark Shalda & Ian will be meeting Definity onsite on 05/11 to discuss WFM options\n05/01: Internal follow-up meeting scheduled on 05/04\n04/16: Raised risk internally to leadership. Scheduled internal sync to discuss mitigation strategy on 04/20",
         "Predecessor": null,
         "Priority": null,
         "_row_id": 1532942197260164
@@ -7448,10 +7448,10 @@
         "Date Assigned": "2026-08-05T08:00:00",
         "Due": "2026-08-21T16:59:59",
         "Duration": "13d",
-        "Progress": "Half",
+        "Progress": "Three Quarter",
         "Done": null,
         "Status": "In Progress",
-        "Notes": "08/18 - Added Companion Agent and update MCP connections\n08/14 - Sent updated diagram with action items to Definity team\n08/12 - Conducted 2 design sessions\n08/05 - Definity request to finalize architecture design for council approval prior to Discovery kickoff and CX Readout closure",
+        "Notes": "08/19 - Alignment on architecture design\n08/18 - Added Companion Agent and update MCP connections\n08/14 - Sent updated diagram with action items to Definity team\n08/12 - Conducted 2 design sessions\n08/05 - Definity request to finalize architecture design for council approval prior to Discovery kickoff and CX Readout closure",
         "Predecessor": null,
         "Priority": null,
         "_row_id": 3902490375487364
@@ -7477,7 +7477,7 @@
         "Risk": null,
         "Project Management/Implementation": "CX Consulting",
         "Category": "Risk",
-        "Description": "Finalize Value Delivery Plan and Migration Strategy",
+        "Description": "Finalize CX Value Delivery Plan and Migration Strategy",
         "Assigned To": "Alfred Shum",
         "Date Assigned": "2026-08-03T08:00:00",
         "Due": "2026-08-31T16:59:59",
