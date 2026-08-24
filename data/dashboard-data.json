@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24T18:03:00.174669+00:00",
+  "generated_at": "2026-08-24T18:30:39.382839+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -7472,6 +7472,40 @@
         "Predecessor": null,
         "Priority": null,
         "_row_id": 5553362060836740
+      },
+      {
+        "Risk": null,
+        "Project Management/Implementation": "CX Consulting",
+        "Category": "Risk",
+        "Description": "Finalize Value Delivery Plan and Migration Strategy",
+        "Assigned To": "Alfred Shum",
+        "Date Assigned": "2026-08-03T08:00:00",
+        "Due": "2026-08-31T16:59:59",
+        "Duration": "21d",
+        "Progress": null,
+        "Done": null,
+        "Status": "In Progress",
+        "Notes": "08/06 - Reschedule draft read-out by client\n07/30 - Reschedule draft read-out by client\n07/29 - Scheduled draft read-out",
+        "Predecessor": null,
+        "Priority": null,
+        "_row_id": 8445933035585412
+      },
+      {
+        "Risk": null,
+        "Project Management/Implementation": "Implementation",
+        "Category": "Risk",
+        "Description": "Discovery kickoff",
+        "Assigned To": "Alfred Shum",
+        "Date Assigned": "2026-08-10T08:00:00",
+        "Due": "2026-08-31T16:59:59",
+        "Duration": "16d",
+        "Progress": null,
+        "Done": null,
+        "Status": "In Progress",
+        "Notes": "08/20 - Requested again to schedule kickoff\n08/13 - Requested to schedule kickoff",
+        "Predecessor": null,
+        "Priority": null,
+        "_row_id": 283158710976388
       },
       {
         "Risk": null,
