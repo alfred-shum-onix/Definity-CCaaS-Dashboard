@@ -390,6 +390,85 @@
     font-size: 13px;
   }
 
+  /* ---------- PM Notes panel ---------- */
+  .pm-notes-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 18px 20px;
+  }
+
+  .pm-notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .pm-notes-meta { font-size: 11px; color: var(--muted); }
+
+  .pm-edit-btn, .pm-save-btn, .pm-cancel-btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    background: var(--bg);
+    color: var(--navy-mid);
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  .pm-save-btn { background: var(--navy-mid); color: #fff; border-color: var(--navy-mid); }
+  .pm-cancel-btn { color: var(--muted); }
+  .pm-save-btn:disabled, .pm-cancel-btn:disabled { opacity: 0.6; cursor: default; }
+
+  .pm-health-select { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .pm-health-opt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1.5px solid var(--panel-border);
+    background: var(--bg);
+    color: var(--muted);
+  }
+
+  .pm-health-opt.active-green { border-color: var(--green); background: var(--green-bg); color: var(--green); }
+  .pm-health-opt.active-amber { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
+  .pm-health-opt.active-red { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+  .pm-health-opt[data-health] { cursor: pointer; }
+
+  .pm-notes-text { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; }
+
+  .pm-name-input, .pm-notes-textarea {
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    color: var(--text);
+  }
+
+  .pm-name-input { width: 220px; margin-bottom: 10px; display: block; }
+
+  .pm-notes-textarea {
+    width: 100%;
+    min-height: 100px;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+  }
+
+  .pm-token-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .pm-error { font-size: 12px; color: var(--red); margin-top: 8px; font-weight: 600; }
+
   footer {
     margin-top: 24px;
     font-size: 11px;
@@ -418,6 +497,11 @@
 <section>
   <div class="section-title">Program Health</div>
   <div class="health-row" id="health-row"></div>
+</section>
+
+<section>
+  <div class="section-title">Program Manager Notes</div>
+  <div class="pm-notes-panel" id="pm-notes-panel">Loading…</div>
 </section>
 
 <section>
@@ -482,6 +566,22 @@ const RAID_OWNER_COL = ["Owner", "Assigned To"];
 const RAID_MIT_COL = ["Mitigation / Note", "Mitigation", "Notes", "Details"];
 const RAID_STATUS_COL = ["Status"];
 
+// ---- PM manual overrides (overall health + free-text notes) ----
+// Stored in a SEPARATE file from dashboard-data.json specifically so the
+// scheduled Smartsheet pull (pull_smartsheet_data.py / update-dashboard.yml)
+// can never overwrite what the PM enters here. Fill in your repo details
+// below to enable saving directly from the dashboard.
+const GITHUB_OWNER = "YOUR_GITHUB_ORG_OR_USERNAME";
+const GITHUB_REPO = "YOUR_REPO_NAME";
+const GITHUB_BRANCH = "main";
+const MANUAL_OVERRIDES_PATH = "data/manual-overrides.json";
+
+let currentManualOverrides = { overall_status: null, pm_comments: "", updated_at: null, updated_by: null };
+let lastWorkstreams = [];
+let pmEditMode = false;
+let pmSaving = false;
+let pmError = null;
+
 function firstMatch(row, candidates) {
   for (const key of candidates) {
     if (row[key] !== undefined && row[key] !== null && row[key] !== "") return row[key];
@@ -509,6 +609,134 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
+}
+
+function getGithubToken(promptIfMissing) {
+  let token = localStorage.getItem("jithub_pat");
+  if (!token && promptIfMissing) {
+    token = window.prompt(
+      "Enter a GitHub Personal Access Token with 'Contents: Read and write' permission on this repo.\n" +
+      "It's stored only in this browser (localStorage) and sent only to api.github.com — never committed to the repo."
+    );
+    if (token) localStorage.setItem("jithub_pat", token.trim());
+  }
+  return token ? token.trim() : null;
+}
+
+async function saveManualOverrides(overrides) {
+  const token = getGithubToken(true);
+  if (!token) throw new Error("No GitHub token provided — save cancelled.");
+
+  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${MANUAL_OVERRIDES_PATH}`;
+  const headers = { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" };
+
+  // Look up the current file's sha — required by GitHub's API to update an
+  // existing file. A 404 just means this is the very first save (no sha needed).
+  let sha = null;
+  const getRes = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers });
+  if (getRes.ok) {
+    sha = (await getRes.json()).sha;
+  } else if (getRes.status !== 404) {
+    throw new Error(`Couldn't read the current file (HTTP ${getRes.status}). Check the token's permissions and repo name.`);
+  }
+
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(overrides, null, 2) + "\n")));
+  const body = { message: `Update program manager notes — ${new Date().toISOString()}`, content, branch: GITHUB_BRANCH };
+  if (sha) body.sha = sha;
+
+  const putRes = await fetch(apiUrl, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!putRes.ok) {
+    if (putRes.status === 401 || putRes.status === 403) localStorage.removeItem("jithub_pat"); // bad/expired token
+    const errBody = await putRes.json().catch(() => ({}));
+    throw new Error(errBody.message || `Save failed (HTTP ${putRes.status}).`);
+  }
+}
+
+function renderPmNotes() {
+  const panel = document.getElementById("pm-notes-panel");
+  const health = normalizeHealth(currentManualOverrides.overall_status) || "green";
+  const updatedLine = currentManualOverrides.updated_at
+    ? `Last updated ${new Date(currentManualOverrides.updated_at).toLocaleString()}${currentManualOverrides.updated_by ? ` by ${escapeHtml(currentManualOverrides.updated_by)}` : ""}`
+    : "No manual updates yet";
+  const healthLabel = h => h === "amber" ? "Amber" : h.charAt(0).toUpperCase() + h.slice(1);
+
+  if (!pmEditMode) {
+    panel.innerHTML = `
+      <div class="pm-notes-header">
+        <span class="pm-notes-meta">${updatedLine}</span>
+        <button class="pm-edit-btn" id="pm-edit-btn">Edit</button>
+      </div>
+      <div class="pm-health-select">
+        ${["green", "amber", "red"].map(h => `
+          <span class="pm-health-opt ${h === health ? "active-" + h : ""}">
+            <span class="health-dot dot-${h}"></span>${healthLabel(h)}
+          </span>`).join("")}
+      </div>
+      <div class="pm-notes-text">${currentManualOverrides.pm_comments
+        ? escapeHtml(currentManualOverrides.pm_comments).replace(/\n/g, "<br>")
+        : '<span style="color:var(--muted)">No comments yet — click Edit to add one.</span>'}</div>
+    `;
+    document.getElementById("pm-edit-btn").onclick = () => { pmEditMode = true; pmError = null; renderPmNotes(); };
+    return;
+  }
+
+  let pendingHealth = health;
+  panel.innerHTML = `
+    <div class="pm-notes-header">
+      <span class="pm-notes-meta">${updatedLine}</span>
+      <div style="display:flex; gap:8px;">
+        <button class="pm-cancel-btn" id="pm-cancel-btn" ${pmSaving ? "disabled" : ""}>Cancel</button>
+        <button class="pm-save-btn" id="pm-save-btn" ${pmSaving ? "disabled" : ""}>${pmSaving ? "Saving…" : "Save"}</button>
+      </div>
+    </div>
+    <input type="text" class="pm-name-input" id="pm-name-input" placeholder="Your name (for the update log)"
+      value="${escapeHtml(localStorage.getItem("jithub_pm_name") || "")}">
+    <div class="pm-health-select" id="pm-health-select">
+      ${["green", "amber", "red"].map(h => `
+        <span class="pm-health-opt ${h === health ? "active-" + h : ""}" data-health="${h}">
+          <span class="health-dot dot-${h}"></span>${healthLabel(h)}
+        </span>`).join("")}
+    </div>
+    <textarea class="pm-notes-textarea" id="pm-notes-textarea" placeholder="Notes for stakeholders...">${escapeHtml(currentManualOverrides.pm_comments || "")}</textarea>
+    ${pmError ? `<div class="pm-error">${escapeHtml(pmError)}</div>` : ""}
+    <div class="pm-token-note">Saves directly to ${escapeHtml(GITHUB_OWNER)}/${escapeHtml(GITHUB_REPO)} on GitHub. First save will ask for a Personal Access Token (kept only in this browser).</div>
+  `;
+
+  document.querySelectorAll("#pm-health-select .pm-health-opt").forEach(el => {
+    el.onclick = () => {
+      pendingHealth = el.dataset.health;
+      document.querySelectorAll("#pm-health-select .pm-health-opt").forEach(o => o.classList.remove("active-green", "active-amber", "active-red"));
+      el.classList.add("active-" + pendingHealth);
+    };
+  });
+
+  document.getElementById("pm-cancel-btn").onclick = () => { pmEditMode = false; pmError = null; renderPmNotes(); };
+  document.getElementById("pm-save-btn").onclick = async () => {
+    const name = document.getElementById("pm-name-input").value.trim();
+    if (name) localStorage.setItem("jithub_pm_name", name);
+    const updated = {
+      overall_status: pendingHealth,
+      pm_comments: document.getElementById("pm-notes-textarea").value.trim(),
+      updated_at: new Date().toISOString(),
+      updated_by: name || "Program Manager",
+    };
+    pmSaving = true; pmError = null; renderPmNotes();
+    try {
+      await saveManualOverrides(updated);
+      currentManualOverrides = updated;
+      pmEditMode = false;
+      renderHealth(normalizeHealth(updated.overall_status), lastWorkstreams); // reflect new color immediately
+    } catch (err) {
+      pmError = err.message || "Save failed.";
+    } finally {
+      pmSaving = false;
+      renderPmNotes();
+    }
+  };
 }
 
 function renderHealth(overallHealth, workstreams) {
@@ -839,7 +1067,8 @@ function hydrate(data) {
 
   const workstreams = computeWorkstreams(planRows);
   const stats = computeStats(planRows);
-  const overallHealth = normalizeHealth(data.overall_status) || statusHealth(planRows);
+  lastWorkstreams = workstreams;
+  const overallHealth = normalizeHealth(currentManualOverrides.overall_status) || statusHealth(planRows);
 
   document.getElementById("exec-summary").innerHTML =
     `The program is <strong>${stats.overallPct}% complete</strong> across <strong>${workstreams.length} workstream${workstreams.length === 1 ? "" : "s"}</strong>, with <strong>${stats.complete} of ${stats.total} tasks</strong> closed out and <strong>${stats.inProgress} in progress</strong>. ${raidRows.length > 0 ? `<strong>${raidRows.length} open RAID item${raidRows.length === 1 ? "" : "s"}</strong> are being tracked below.` : ""}`;
@@ -851,18 +1080,30 @@ function hydrate(data) {
   renderRaid(raidRows);
   renderPhases(workstreams);
   renderCompleted(workstreams);
+  renderPmNotes();
 }
 
 async function loadDashboard() {
+  let data;
   try {
     const res = await fetch("data/dashboard-data.json", { cache: "no-store" });
     if (!res.ok) throw new Error("fetch failed");
-    const data = await res.json();
-    hydrate(data);
+    data = await res.json();
   } catch (err) {
     console.warn("Falling back to sample data:", err);
-    hydrate(SAMPLE_DATA);
+    data = SAMPLE_DATA;
   }
+
+  // Manual overrides live in their own file so the scheduled Smartsheet pull
+  // never overwrites them. Missing file (first run, nothing saved yet) is fine.
+  try {
+    const movRes = await fetch("data/manual-overrides.json", { cache: "no-store" });
+    if (movRes.ok) currentManualOverrides = { ...currentManualOverrides, ...(await movRes.json()) };
+  } catch (err) {
+    console.warn("No manual-overrides.json yet:", err);
+  }
+
+  hydrate(data);
 }
 
 // Sample data shown only if data/dashboard-data.json isn't reachable (e.g. local preview)
