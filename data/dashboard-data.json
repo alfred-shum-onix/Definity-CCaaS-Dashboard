@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-25T11:59:14.335183+00:00",
+  "generated_at": "2026-08-25T14:29:04.354127+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -7465,7 +7465,7 @@
         "Date Assigned": "2026-08-07T08:00:00",
         "Due": "2026-08-28T16:59:59",
         "Duration": "16d",
-        "Progress": null,
+        "Progress": "Three Quarter",
         "Done": null,
         "Status": "In Progress",
         "Notes": "08/18 - Continue to review and adjust resource allocation\n08/11 - Remove ghost resources and adjust resource allocation to reflect actual workloads",
@@ -7474,7 +7474,7 @@
         "_row_id": 5553362060836740
       },
       {
-        "Risk": null,
+        "Risk": true,
         "Project Management/Implementation": "CX Consulting",
         "Category": "Risk",
         "Description": "Finalize CX Value Delivery Plan and Migration Strategy",
@@ -7482,7 +7482,7 @@
         "Date Assigned": "2026-08-03T08:00:00",
         "Due": "2026-08-31T16:59:59",
         "Duration": "21d",
-        "Progress": null,
+        "Progress": "Half",
         "Done": null,
         "Status": "In Progress",
         "Notes": "08/06 - Reschedule draft read-out by client\n07/30 - Reschedule draft read-out by client\n07/29 - Scheduled draft read-out",
@@ -7491,7 +7491,7 @@
         "_row_id": 8445933035585412
       },
       {
-        "Risk": null,
+        "Risk": true,
         "Project Management/Implementation": "Implementation",
         "Category": "Risk",
         "Description": "Discovery kickoff",
@@ -7499,13 +7499,30 @@
         "Date Assigned": "2026-08-10T08:00:00",
         "Due": "2026-08-31T16:59:59",
         "Duration": "16d",
-        "Progress": null,
+        "Progress": "Half",
         "Done": null,
         "Status": "In Progress",
         "Notes": "08/20 - Requested again to schedule kickoff\n08/13 - Requested to schedule kickoff",
         "Predecessor": null,
         "Priority": null,
         "_row_id": 283158710976388
+      },
+      {
+        "Risk": true,
+        "Project Management/Implementation": "Project Management",
+        "Category": "Risk",
+        "Description": "Project Termination Notice",
+        "Assigned To": "Alfred Shum",
+        "Date Assigned": "2026-08-21T08:00:00",
+        "Due": "2026-08-28T16:59:59",
+        "Duration": "6d",
+        "Progress": "Quarter",
+        "Done": null,
+        "Status": "In Progress",
+        "Notes": "08/21 - Definity issued Project Termination Notice",
+        "Predecessor": null,
+        "Priority": null,
+        "_row_id": 2839212296634244
       },
       {
         "Risk": null,
