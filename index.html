@@ -409,22 +409,6 @@
 
   .pm-notes-meta { font-size: 11px; color: var(--muted); }
 
-  .pm-edit-btn, .pm-save-btn, .pm-cancel-btn {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid var(--panel-border);
-    background: var(--bg);
-    color: var(--navy-mid);
-    cursor: pointer;
-    font-family: var(--font);
-  }
-
-  .pm-save-btn { background: var(--navy-mid); color: #fff; border-color: var(--navy-mid); }
-  .pm-cancel-btn { color: var(--muted); }
-  .pm-save-btn:disabled, .pm-cancel-btn:disabled { opacity: 0.6; cursor: default; }
-
   .pm-health-select { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
   .pm-health-opt {
@@ -443,31 +427,35 @@
   .pm-health-opt.active-green { border-color: var(--green); background: var(--green-bg); color: var(--green); }
   .pm-health-opt.active-amber { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
   .pm-health-opt.active-red { border-color: var(--red); background: var(--red-bg); color: var(--red); }
-  .pm-health-opt[data-health] { cursor: pointer; }
 
   .pm-notes-text { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; }
 
-  .pm-name-input, .pm-notes-textarea {
-    font-family: var(--font);
+  .pm-comment-history {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--panel-border);
+  }
+
+  .pm-comment-history .pm-history-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .pm-comment-item {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
     font-size: 13px;
-    padding: 8px 10px;
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    color: var(--text);
+    color: var(--muted);
+    padding: 5px 0;
   }
 
-  .pm-name-input { width: 220px; margin-bottom: 10px; display: block; }
-
-  .pm-notes-textarea {
-    width: 100%;
-    min-height: 100px;
-    font-size: 14px;
-    line-height: 1.6;
-    resize: vertical;
-  }
-
-  .pm-token-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
-  .pm-error { font-size: 12px; color: var(--red); margin-top: 8px; font-weight: 600; }
+  .pm-comment-item .health-dot { flex-shrink: 0; }
+  .pm-comment-item span:last-child { color: var(--text); }
 
   footer {
     margin-top: 24px;
@@ -566,21 +554,15 @@ const RAID_OWNER_COL = ["Owner", "Assigned To"];
 const RAID_MIT_COL = ["Mitigation / Note", "Mitigation", "Notes", "Details"];
 const RAID_STATUS_COL = ["Status"];
 
-// ---- PM manual overrides (overall health + free-text notes) ----
-// Stored in a SEPARATE file from dashboard-data.json specifically so the
-// scheduled Smartsheet pull (pull_smartsheet_data.py / update-dashboard.yml)
-// can never overwrite what the PM enters here. Fill in your repo details
-// below to enable saving directly from the dashboard.
-const GITHUB_OWNER = "YOUR_GITHUB_ORG_OR_USERNAME";
-const GITHUB_REPO = "YOUR_REPO_NAME";
-const GITHUB_BRANCH = "main";
-const MANUAL_OVERRIDES_PATH = "data/manual-overrides.json";
+// ---- Project Comment sheet (PM-entered health + comments) ----
+// Pulled by pull_smartsheet_data.py from a Smartsheet the PM edits directly
+// (same sheet-based source of truth as everything else on this dashboard),
+// so there's no separate manual file and no risk of it being overwritten —
+// it just comes down with the rest of the scheduled pull.
+const COMMENT_HEALTH_COL = ["Health"];
+const COMMENT_TEXT_COL = ["Comments", "Comment"];
 
-let currentManualOverrides = { overall_status: null, pm_comments: "", updated_at: null, updated_by: null };
 let lastWorkstreams = [];
-let pmEditMode = false;
-let pmSaving = false;
-let pmError = null;
 
 function firstMatch(row, candidates) {
   for (const key of candidates) {
@@ -611,132 +593,42 @@ function escapeHtml(str) {
   }[m]));
 }
 
-function getGithubToken(promptIfMissing) {
-  let token = localStorage.getItem("jithub_pat");
-  if (!token && promptIfMissing) {
-    token = window.prompt(
-      "Enter a GitHub Personal Access Token with 'Contents: Read and write' permission on this repo.\n" +
-      "It's stored only in this browser (localStorage) and sent only to api.github.com — never committed to the repo."
-    );
-    if (token) localStorage.setItem("jithub_pat", token.trim());
-  }
-  return token ? token.trim() : null;
-}
-
-async function saveManualOverrides(overrides) {
-  const token = getGithubToken(true);
-  if (!token) throw new Error("No GitHub token provided — save cancelled.");
-
-  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${MANUAL_OVERRIDES_PATH}`;
-  const headers = { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" };
-
-  // Look up the current file's sha — required by GitHub's API to update an
-  // existing file. A 404 just means this is the very first save (no sha needed).
-  let sha = null;
-  const getRes = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers });
-  if (getRes.ok) {
-    sha = (await getRes.json()).sha;
-  } else if (getRes.status !== 404) {
-    throw new Error(`Couldn't read the current file (HTTP ${getRes.status}). Check the token's permissions and repo name.`);
-  }
-
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(overrides, null, 2) + "\n")));
-  const body = { message: `Update program manager notes — ${new Date().toISOString()}`, content, branch: GITHUB_BRANCH };
-  if (sha) body.sha = sha;
-
-  const putRes = await fetch(apiUrl, {
-    method: "PUT",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!putRes.ok) {
-    if (putRes.status === 401 || putRes.status === 403) localStorage.removeItem("jithub_pat"); // bad/expired token
-    const errBody = await putRes.json().catch(() => ({}));
-    throw new Error(errBody.message || `Save failed (HTTP ${putRes.status}).`);
-  }
-}
-
-function renderPmNotes() {
+function renderProjectComment(projectComment) {
   const panel = document.getElementById("pm-notes-panel");
-  const health = normalizeHealth(currentManualOverrides.overall_status) || "green";
-  const updatedLine = currentManualOverrides.updated_at
-    ? `Last updated ${new Date(currentManualOverrides.updated_at).toLocaleString()}${currentManualOverrides.updated_by ? ` by ${escapeHtml(currentManualOverrides.updated_by)}` : ""}`
-    : "No manual updates yet";
+  const rows = (projectComment && projectComment.rows) || [];
   const healthLabel = h => h === "amber" ? "Amber" : h.charAt(0).toUpperCase() + h.slice(1);
 
-  if (!pmEditMode) {
-    panel.innerHTML = `
-      <div class="pm-notes-header">
-        <span class="pm-notes-meta">${updatedLine}</span>
-        <button class="pm-edit-btn" id="pm-edit-btn">Edit</button>
-      </div>
-      <div class="pm-health-select">
-        ${["green", "amber", "red"].map(h => `
-          <span class="pm-health-opt ${h === health ? "active-" + h : ""}">
-            <span class="health-dot dot-${h}"></span>${healthLabel(h)}
-          </span>`).join("")}
-      </div>
-      <div class="pm-notes-text">${currentManualOverrides.pm_comments
-        ? escapeHtml(currentManualOverrides.pm_comments).replace(/\n/g, "<br>")
-        : '<span style="color:var(--muted)">No comments yet — click Edit to add one.</span>'}</div>
-    `;
-    document.getElementById("pm-edit-btn").onclick = () => { pmEditMode = true; pmError = null; renderPmNotes(); };
+  if (rows.length === 0) {
+    panel.innerHTML = `<div class="pm-notes-text" style="color:var(--muted)">No comments yet — add a row to the Project Comment sheet in Smartsheet.</div>`;
     return;
   }
 
-  let pendingHealth = health;
+  // Newest entry is the last row added to the sheet.
+  const latest = rows[rows.length - 1];
+  const earlier = rows.slice(0, -1).reverse();
+  const health = normalizeHealth(firstMatch(latest, COMMENT_HEALTH_COL)) || "green";
+  const comment = firstMatch(latest, COMMENT_TEXT_COL) || "";
+
   panel.innerHTML = `
     <div class="pm-notes-header">
-      <span class="pm-notes-meta">${updatedLine}</span>
-      <div style="display:flex; gap:8px;">
-        <button class="pm-cancel-btn" id="pm-cancel-btn" ${pmSaving ? "disabled" : ""}>Cancel</button>
-        <button class="pm-save-btn" id="pm-save-btn" ${pmSaving ? "disabled" : ""}>${pmSaving ? "Saving…" : "Save"}</button>
-      </div>
+      <span class="pm-notes-meta">Source: Smartsheet · ${escapeHtml(projectComment.sheet_name || "Project Comment")}</span>
     </div>
-    <input type="text" class="pm-name-input" id="pm-name-input" placeholder="Your name (for the update log)"
-      value="${escapeHtml(localStorage.getItem("jithub_pm_name") || "")}">
-    <div class="pm-health-select" id="pm-health-select">
-      ${["green", "amber", "red"].map(h => `
-        <span class="pm-health-opt ${h === health ? "active-" + h : ""}" data-health="${h}">
-          <span class="health-dot dot-${h}"></span>${healthLabel(h)}
-        </span>`).join("")}
+    <div class="pm-health-select">
+      <span class="pm-health-opt active-${health}">
+        <span class="health-dot dot-${health}"></span>${healthLabel(health)}
+      </span>
     </div>
-    <textarea class="pm-notes-textarea" id="pm-notes-textarea" placeholder="Notes for stakeholders...">${escapeHtml(currentManualOverrides.pm_comments || "")}</textarea>
-    ${pmError ? `<div class="pm-error">${escapeHtml(pmError)}</div>` : ""}
-    <div class="pm-token-note">Saves directly to ${escapeHtml(GITHUB_OWNER)}/${escapeHtml(GITHUB_REPO)} on GitHub. First save will ask for a Personal Access Token (kept only in this browser).</div>
+    <div class="pm-notes-text">${comment ? escapeHtml(comment).replace(/\n/g, "<br>") : '<span style="color:var(--muted)">No comment text on the latest entry.</span>'}</div>
+    ${earlier.length > 0 ? `
+      <div class="pm-comment-history">
+        <div class="pm-history-label">Earlier updates</div>
+        ${earlier.map(r => {
+          const h = normalizeHealth(firstMatch(r, COMMENT_HEALTH_COL)) || "green";
+          const c = firstMatch(r, COMMENT_TEXT_COL) || "";
+          return `<div class="pm-comment-item"><span class="health-dot dot-${h}"></span><span>${escapeHtml(c)}</span></div>`;
+        }).join("")}
+      </div>` : ""}
   `;
-
-  document.querySelectorAll("#pm-health-select .pm-health-opt").forEach(el => {
-    el.onclick = () => {
-      pendingHealth = el.dataset.health;
-      document.querySelectorAll("#pm-health-select .pm-health-opt").forEach(o => o.classList.remove("active-green", "active-amber", "active-red"));
-      el.classList.add("active-" + pendingHealth);
-    };
-  });
-
-  document.getElementById("pm-cancel-btn").onclick = () => { pmEditMode = false; pmError = null; renderPmNotes(); };
-  document.getElementById("pm-save-btn").onclick = async () => {
-    const name = document.getElementById("pm-name-input").value.trim();
-    if (name) localStorage.setItem("jithub_pm_name", name);
-    const updated = {
-      overall_status: pendingHealth,
-      pm_comments: document.getElementById("pm-notes-textarea").value.trim(),
-      updated_at: new Date().toISOString(),
-      updated_by: name || "Program Manager",
-    };
-    pmSaving = true; pmError = null; renderPmNotes();
-    try {
-      await saveManualOverrides(updated);
-      currentManualOverrides = updated;
-      pmEditMode = false;
-      renderHealth(normalizeHealth(updated.overall_status), lastWorkstreams); // reflect new color immediately
-    } catch (err) {
-      pmError = err.message || "Save failed.";
-    } finally {
-      pmSaving = false;
-      renderPmNotes();
-    }
-  };
 }
 
 function renderHealth(overallHealth, workstreams) {
@@ -1068,7 +960,10 @@ function hydrate(data) {
   const workstreams = computeWorkstreams(planRows);
   const stats = computeStats(planRows);
   lastWorkstreams = workstreams;
-  const overallHealth = normalizeHealth(currentManualOverrides.overall_status) || statusHealth(planRows);
+  const latestComment = data.project_comment && data.project_comment.rows && data.project_comment.rows.length > 0
+    ? data.project_comment.rows[data.project_comment.rows.length - 1]
+    : null;
+  const overallHealth = (latestComment && normalizeHealth(firstMatch(latestComment, COMMENT_HEALTH_COL))) || statusHealth(planRows);
 
   document.getElementById("exec-summary").innerHTML =
     `The program is <strong>${stats.overallPct}% complete</strong> across <strong>${workstreams.length} workstream${workstreams.length === 1 ? "" : "s"}</strong>, with <strong>${stats.complete} of ${stats.total} tasks</strong> closed out and <strong>${stats.inProgress} in progress</strong>. ${raidRows.length > 0 ? `<strong>${raidRows.length} open RAID item${raidRows.length === 1 ? "" : "s"}</strong> are being tracked below.` : ""}`;
@@ -1080,7 +975,7 @@ function hydrate(data) {
   renderRaid(raidRows);
   renderPhases(workstreams);
   renderCompleted(workstreams);
-  renderPmNotes();
+  renderProjectComment(data.project_comment);
 }
 
 async function loadDashboard() {
@@ -1093,16 +988,6 @@ async function loadDashboard() {
     console.warn("Falling back to sample data:", err);
     data = SAMPLE_DATA;
   }
-
-  // Manual overrides live in their own file so the scheduled Smartsheet pull
-  // never overwrites them. Missing file (first run, nothing saved yet) is fine.
-  try {
-    const movRes = await fetch("data/manual-overrides.json", { cache: "no-store" });
-    if (movRes.ok) currentManualOverrides = { ...currentManualOverrides, ...(await movRes.json()) };
-  } catch (err) {
-    console.warn("No manual-overrides.json yet:", err);
-  }
-
   hydrate(data);
 }
 
@@ -1126,6 +1011,12 @@ const SAMPLE_DATA = {
       { "Type": "Risk", "Description": "Phase 3 go-live at risk pending production build completion", "Owner": "Onix Programme", "Mitigation / Note": "Production build advancing; go-live date under close watch", "Status": "Open" },
       { "Type": "Issue", "Description": "Design restructure — business sign-off at risk for Phase 3", "Owner": "—", "Mitigation / Note": "Transfer process reviewed and agreed; pushed to next phase", "Status": "Open" },
       { "Type": "Decision", "Description": "Outbound Dialer — GCP project location required", "Owner": "A. Siva", "Mitigation / Note": "Awaiting written confirmation", "Status": "Open" },
+    ]
+  },
+  project_comment: {
+    sheet_name: "Project Comment (sample)",
+    rows: [
+      { "Health": "Amber", "Comments": "Phase 3 production build tracking to plan; watching go-live readiness closely." },
     ]
   }
 };
