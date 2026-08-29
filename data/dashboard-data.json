@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T02:16:54.329738+00:00",
+  "generated_at": "2026-08-29T02:20:33.752789+00:00",
   "project_plan": {
     "sheet_name": "Definity | Project Plan",
     "columns": [
@@ -9203,16 +9203,6 @@
         "Health": "Red",
         "Comments": "Definity issued Project Termination Notice",
         "_row_id": 2906934242049924
-      },
-      {
-        "Health": "Red",
-        "Comments": "New comment - Terminated",
-        "_row_id": 4711139088924548
-      },
-      {
-        "Health": null,
-        "Comments": null,
-        "_row_id": 2018982183960452
       }
     ]
   }
