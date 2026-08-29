@@ -23,8 +23,8 @@ jobs:
 
       - name: Install dependencies
         run: pip install smartsheet-python-sdk
-
       - name: Debug secret presence
+        
         env:
           PROJECT_COMMENT_SHEET_ID: ${{ secrets.PROJECT_COMMENT_SHEET_ID }}
         run: |
