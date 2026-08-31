@@ -541,6 +541,12 @@ const PLAN_PCT_COL = ["% Complete", "Percent Complete", "Completion", "%"];
 // header rows so tasks can be grouped by the section they fall under.
 // Also matches combined/range headers like "Workstreams 6-8: AI Agents / Insights".
 const WORKSTREAM_HEADER_RE = /^workstreams?\s*\d+(?:\s*-\s*\d+)?\s*:\s*(.+)$/i;
+// "Billing Milestones" is its own section header row in the sheet, but unlike the
+// others it has no "Workstream N:" prefix — so without this it silently gets folded
+// into whichever numbered workstream happens to precede it (currently Workstream 10).
+// It's billing-specific, not part of that workstream's actual scope, so it's treated
+// as its own section here.
+const BILLING_MILESTONES_HEADER_RE = /^billing milestones$/i;
 // Sub-section headers used inconsistently within some workstreams — not every
 // workstream has these, so grouping falls back to a flat task list where absent.
 const PHASE_HEADER_RE = /^phase\s*\d+\s*:\s*(.+)$/i;
@@ -848,13 +854,14 @@ function computeWorkstreams(planRows) {
   for (const row of planRows) {
     const taskName = String(firstMatch(row, PLAN_TASK_COL) || "");
     const wsMatch = taskName.match(WORKSTREAM_HEADER_RE);
-    const phaseMatch = !wsMatch ? taskName.match(PHASE_HEADER_RE) : null;
-    const waveMatch = (!wsMatch && !phaseMatch) ? taskName.match(WAVE_HEADER_RE) : null;
+    const billingMatch = !wsMatch && BILLING_MILESTONES_HEADER_RE.test(taskName.trim());
+    const phaseMatch = (!wsMatch && !billingMatch) ? taskName.match(PHASE_HEADER_RE) : null;
+    const waveMatch = (!wsMatch && !billingMatch && !phaseMatch) ? taskName.match(WAVE_HEADER_RE) : null;
 
-    if (wsMatch) {
-      // This row is itself a section header (e.g. "Workstream 1: Project Management") —
-      // start a new group and don't count the header row as a task.
-      currentSection = wsMatch[1].trim();
+    if (wsMatch || billingMatch) {
+      // This row is itself a section header (e.g. "Workstream 1: Project Management", or
+      // "Billing Milestones") — start a new group and don't count the header row as a task.
+      currentSection = wsMatch ? wsMatch[1].trim() : "Billing Milestones";
       currentPhase = null;
       currentWave = null;
       const isFirstSection = !groups[currentSection] && order.length === 0;
