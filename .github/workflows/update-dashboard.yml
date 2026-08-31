@@ -2,8 +2,8 @@ name: Update Dashboard Data
 
 on:
   schedule:
-    # Runs every hour. Adjust the cron expression as needed.
-    - cron: "0 * * * *"
+    # Runs once a day at 11:00 UTC (~7am Toronto/EDT). Adjust the cron expression as needed.
+    - cron: "0 11 * * *"
   workflow_dispatch: {}  # allows manual trigger from the Actions tab
 
 permissions:
